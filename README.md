@@ -1,5 +1,11 @@
 EntityLocker
 ------------
+- [Description](#Description)
+- [Implementation](#Implementation)
+    - [AbstractEntityLockerImpl](#AbstractEntityLockerImpl)
+        - [EntityReentrantLockImpl](#EntityReentrantLockImpl)
+        - [EntityCustomLockImpl](#EntityCustomLockImpl)
+        - [CustomLock](#CustomLock)
 
 # Description
 
@@ -52,7 +58,7 @@ Test for all implementation are [here](src/test/java/ofedorova/enity/sync/impl/E
 ### EntityCustomLockImpl
 [EntityCustomLockImpl](src/main/java/ofedorova/enity/sync/impl/EntityCustomLockImpl.java) class uses lockStorage with [`CustomLock`](src/main/java/ofedorova/enity/sync/impl/CustomLock.java) implementation.
 
-##№ CustomLock
+### CustomLock
 The class [`CustomLock`](src/main/java/ofedorova/enity/sync/impl/CustomLock.java) implements the `java.util.concurrent.locks.Lock` interface. 
 The class implements two main methods:
 ```java
