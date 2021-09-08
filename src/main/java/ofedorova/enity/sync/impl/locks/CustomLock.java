@@ -1,17 +1,20 @@
-package ofedorova.enity.sync.impl;
+package ofedorova.enity.sync.impl.locks;
 
+import ofedorova.enity.sync.EntityLock;
+
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
 
 /**
  * CustomLock.
  *
  * @author Olga_Fedorova
  */
-class CustomLock implements Lock {
+public class CustomLock implements EntityLock {
 
     private volatile Thread ownerThread;
     private final AtomicInteger state = new AtomicInteger(0);
@@ -101,5 +104,20 @@ class CustomLock implements Lock {
             state.decrementAndGet();
             return free;
         }
+    }
+
+    @Override
+    public Thread getOwner() {
+        return ownerThread;
+    }
+
+    @Override
+    public Set<Thread> getOwnerAndQueuedThreads() {
+        Set<Thread> queued = new HashSet<>();
+        queued.addAll(waiters);
+        if (ownerThread != null) {
+            queued.add(ownerThread);
+        }
+        return queued;
     }
 }

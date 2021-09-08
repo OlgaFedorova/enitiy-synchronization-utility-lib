@@ -1,24 +1,28 @@
 EntityLocker
 ------------
-- [Description](#Description)
+- [Interface EntityLocker](#Interface-EntityLocker)
 - [Implementation](#Implementation)
     - [AbstractEntityLockerImpl](#AbstractEntityLockerImpl)
-        - [EntityReentrantLockImpl](#EntityReentrantLockImpl)
+        - [EntityExtendedReentrantLockImpl](#EntityExtendedReentrantLockImpl)
         - [EntityCustomLockImpl](#EntityCustomLockImpl)
+        - [EntityLock](#EntityLock)
+        - [ExtendedReentrantLock](#ExtendedReentrantLock)
         - [CustomLock](#CustomLock)
+        - [DeadlockChecker](#DeadlockChecker)
 
-# Description
+# Interface EntityLocker
 
-Implementation of [EntityLocker](src/main/java/ofedorova/enity/sync/EntityLocker.java) interface is a reusable utility class that provides synchronization mechanism similar to row-level DB locking.
+Implementation of [EntityLocker](src/main/java/ofedorova/enity/sync/EntityLocker.java) interface is a reusable utility class 
+that provides synchronization mechanism similar to row-level DB locking.
 
 The class is supposed to be used by the components that are responsible for managing storage and caching of different type of entities in 
-the application. EntityLocker itself does not deal with the entities, only with the IDs (primary keys) of the entities.
+the application. `EntityLocker` itself does not deal with the entities, only with the IDs (primary keys) of the entities.
 
-Features:
+**Features:**
 
-1. EntityLocker supports different types of entity IDs.
+1. `EntityLocker` supports different types of entity IDs.
 
-2. EntityLocker’s interface allows the caller to specify which entity does it want to work with (using entity ID), and designate 
+2. `EntityLocker` interface allows the caller to specify which entity does it want to work with (using entity ID), and designate 
 the boundaries of the code that should have exclusive access to the entity (called “protected code”) with construction:
  ```java
 EntityLocker entityLocker;
@@ -32,34 +36,61 @@ T entityId;
  }
  ```
 
-3. For any given entity, EntityLocker guarantees that at most one thread executes protected code on that entity. If there’s a 
+3. For any given entity, `EntityLocker` guarantees that at most one thread executes protected code on that entity. If there’s a 
 concurrent request to lock the same entity, the other thread should wait until the entity becomes available.
 
-4. EntityLocker allows concurrent execution of protected code on different entities.
+4. `EntityLocker` allows concurrent execution of protected code on different entities.
 
 5. It allows reentrant locking.
+
+6. It allows the caller to specify timeout for locking an entity.
+
+7. It implements protection from deadlocks (but not taking into account possible locks outside EntityLocker).
 
 # Implementation
 
 ## AbstractEntityLockerImpl
 The main implementation of the [EntityLocker](src/main/java/ofedorova/enity/sync/EntityLocker.java) interface is represented by the 
-[AbstractEntityLockerImpl](src/main/java/ofedorova/enity/sync/impl/AbstractEntityLockerImpl.java) class.
-The class contains one abstract method Lock getLock (T entityId) that allows you to define the implementation of the Lock interface for the lockStorage variable to use.
+[AbstractEntityLockerImpl](src/main/java/ofedorova/enity/sync/impl/lockers/AbstractEntityLockerImpl.java) class.
+The class contains one abstract method `EntityLockInfo getLock(T entityId)` that allows you to define the implementation 
+of the [`EntityLock`](src/main/java/ofedorova/enity/sync/EntityLock.java) interface for the field `lock` in object of type
+[`EntityLockInfo`](src/main/java/ofedorova/enity/sync/EntityLockInfo.java).
+ 
+[`EntityLockInfo`](src/main/java/ofedorova/enity/sync/EntityLockInfo.java) class is used for `lockStorage` variable that holds lock 
+for entity in [AbstractEntityLockerImpl](src/main/java/ofedorova/enity/sync/impl/lockers/AbstractEntityLockerImpl.java) class.
 
 The class is extended by two implementations:
-- [EntityReentrantLockImpl](src/main/java/ofedorova/enity/sync/impl/EntityReentrantLockImpl.java)
-- [EntityCustomLockImpl](src/main/java/ofedorova/enity/sync/impl/EntityCustomLockImpl.java)
+- [EntityExtendedReentrantLockImpl](src/main/java/ofedorova/enity/sync/impl/lockers/EntityExtendedReentrantLockImpl.java)
+- [EntityCustomLockImpl](src/main/java/ofedorova/enity/sync/impl/lockers/EntityCustomLockImpl.java)
 
-Test for all implementation are [here](src/test/java/ofedorova/enity/sync/impl/EntityLockerImplTest.java).
+Test for all implementation are [here](src/test/java/ofedorova/enity/sync/impl/lockers/EntityLockerImplTest.java).
 
-### EntityReentrantLockImpl
-[EntityReentrantLockImpl](src/main/java/ofedorova/enity/sync/impl/EntityReentrantLockImpl.java) class uses lockStorage with `java.util.concurrent.locks.ReentrantLock` implementation.
+### EntityExtendedReentrantLockImpl
+[EntityExtendedReentrantLockImpl](src/main/java/ofedorova/enity/sync/impl/lockers/EntityExtendedReentrantLockImpl.java) class 
+uses `lockStorage` with [`ExtendedReentrantLock`](src/main/java/ofedorova/enity/sync/impl/locks/ExtendedReentrantLock.java) implementation.
 
 ### EntityCustomLockImpl
-[EntityCustomLockImpl](src/main/java/ofedorova/enity/sync/impl/EntityCustomLockImpl.java) class uses lockStorage with [`CustomLock`](src/main/java/ofedorova/enity/sync/impl/CustomLock.java) implementation.
+[EntityCustomLockImpl](src/main/java/ofedorova/enity/sync/impl/lockers/EntityCustomLockImpl.java) class uses `lockStorage` 
+with [`CustomLock`](src/main/java/ofedorova/enity/sync/impl/locks/CustomLock.java) implementation.
+
+### EntityLock
+The interface [EntityLock](src/main/java/ofedorova/enity/sync/EntityLock.java) extends the `java.util.concurrent.locks.Lock` interface, 
+and exposes new methods:
+```java
+
+    Thread getOwner();
+
+    Set<Thread> getOwnerAndQueuedThreads();
+```
+These methods are used in the algorithm for determining a possible deadlock.
+
+### ExtendedReentrantLock
+The class [`ExtendedReentrantLock`](src/main/java/ofedorova/enity/sync/impl/locks/ExtendedReentrantLock.java) implements 
+the [`EntityLock`](src/main/java/ofedorova/enity/sync/EntityLock.java) interface and extends `java.util.concurrent.locks.ReentrantLock`. 
 
 ### CustomLock
-The class [`CustomLock`](src/main/java/ofedorova/enity/sync/impl/CustomLock.java) implements the `java.util.concurrent.locks.Lock` interface. 
+The class [`CustomLock`](src/main/java/ofedorova/enity/sync/impl/locks/CustomLock.java) implements the 
+[`EntityLock`](src/main/java/ofedorova/enity/sync/EntityLock.java) interface. 
 The class implements two main methods:
 ```java
 @Override
@@ -91,4 +122,22 @@ try {
 
 3. Allow reentrant locking
 
-Tests for class are implement [here](src/test/java/ofedorova/enity/sync/impl/CustomLockTest.java).
+Tests for class are implement [here](src/test/java/ofedorova/enity/sync/impl/locks/CustomLockTest.java).
+
+### DeadlockChecker
+The [`DeadlockChecker`](src/main/java/ofedorova/enity/sync/impl/DeadlockChecker.java) interface is used to determine a possible deadlock in case of an attempt to block the entity and 
+throws a [`DeadlockException`](src/main/java/ofedorova/enity/sync/exception/DeadlockException.java) error.
+The interface implements the [`DeadlockCheckerImpl`](src/main/java/ofedorova/enity/sync/impl/lockers/DeadlockCheckerImpl.java) class.
+For determine a possible deadlock, we are  try to make a list of deadlock resources. If the size of the list is 
+greater than or equal to 2, then this is a deadlock case.
+The list is built by traversing resources and threads that hold them or are in the queue to wait for a lock.
+
+Example:
+- Thread1 holds Resource1, Resource4, wait Resource2
+- Thread2 holds Resource2, Resource5
+- Thread3 holds Resource3, wait Resource4
+
+When Thread2 tries to block Resource3 gets deadlock with Resource3, Resource2, Resource4.
+
+
+Tests for class are implement [here](src/test/java/ofedorova/enity/sync/impl/lockers/DeadlockCheckerImplTest.java).

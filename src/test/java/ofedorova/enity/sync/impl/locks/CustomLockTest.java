@@ -1,4 +1,4 @@
-package ofedorova.enity.sync.impl;
+package ofedorova.enity.sync.impl.locks;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
