@@ -19,4 +19,10 @@ public interface EntityLocker<T> {
 
     void unlock(T entityId);
 
+    void globalLock();
+
+    boolean tryGlobalLock(long timeout , TimeUnit timeUnit) throws InterruptedException;
+
+    void globalUnlock();
+
 }

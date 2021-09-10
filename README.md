@@ -58,6 +58,31 @@ concurrent request to lock the same entity, the other thread should wait until t
 
 7. It implements protection from deadlocks (but not taking into account possible locks outside EntityLocker).
 
+8. It implements global lock. Protected code that executes under a global lock must not execute concurrently 
+with any other protected code with construction:
+```java
+EntityLocker entityLocker;
+.....
+try {
+   entityLocker.globalLock();
+   ...;
+} finally {
+   entityLocker.globalUnlock();
+}
+```
+
+or with construction:
+```java
+EntityLocker entityLocker;
+.....
+try {
+   entityLocker.tryGlobalLock(10, TimeUnit.SECONDS);
+   ...;
+} finally {
+   entityLocker.globalUnlock();
+}
+```
+
 # Implementation
 
 ## AbstractEntityLockerImpl
@@ -148,9 +173,9 @@ try {
 Tests for class are implement [here](src/test/java/ofedorova/enity/sync/impl/locks/CustomLockTest.java).
 
 ### DeadlockChecker
-The [`DeadlockChecker`](src/main/java/ofedorova/enity/sync/impl/DeadlockChecker.java) interface is used to determine a possible deadlock in case of an attempt to block the entity and 
+The [`DeadlockChecker`](src/main/java/ofedorova/enity/sync/DeadlockChecker.java) interface is used to determine a possible deadlock in case of an attempt to block the entity and 
 throws a [`DeadlockException`](src/main/java/ofedorova/enity/sync/exception/DeadlockException.java) error.
-The interface implements the [`DeadlockCheckerImpl`](src/main/java/ofedorova/enity/sync/impl/lockers/DeadlockCheckerImpl.java) class.
+The interface implements the [`DeadlockCheckerImpl`](src/main/java/ofedorova/enity/sync/impl/utils/DeadlockCheckerImpl.java) class.
 For determine a possible deadlock, we are  try to make a list of deadlock resources. If the size of the list is 
 greater than or equal to 2, then this is a deadlock case.
 The list is built by traversing resources and threads that hold them or are in the queue to wait for a lock.
@@ -163,4 +188,4 @@ Example:
 When Thread2 tries to block Resource3 gets deadlock with Resource3, Resource2, Resource4.
 
 
-Tests for class are implement [here](src/test/java/ofedorova/enity/sync/impl/lockers/DeadlockCheckerImplTest.java).
+Tests for class are implement [here](src/test/java/ofedorova/enity/sync/impl/utils/DeadlockCheckerImplTest.java).

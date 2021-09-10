@@ -1,6 +1,4 @@
-package ofedorova.enity.sync.impl;
-
-import ofedorova.enity.sync.EntityLockInfo;
+package ofedorova.enity.sync;
 
 /**
  * DeadlockChecker.

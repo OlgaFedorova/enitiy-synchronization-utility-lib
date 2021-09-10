@@ -1,8 +1,8 @@
-package ofedorova.enity.sync.impl.lockers;
+package ofedorova.enity.sync.impl.utils;
 
 import ofedorova.enity.sync.EntityLockInfo;
 import ofedorova.enity.sync.exception.DeadlockException;
-import ofedorova.enity.sync.impl.DeadlockChecker;
+import ofedorova.enity.sync.DeadlockChecker;
 
 import java.util.HashSet;
 import java.util.LinkedList;

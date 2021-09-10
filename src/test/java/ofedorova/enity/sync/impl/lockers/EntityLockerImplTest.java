@@ -240,6 +240,187 @@ class EntityLockerImplTest {
         Assertions.assertTrue(timePassed.get() >= TimeUnit.SECONDS.toNanos(10));
     }
 
+    @ParameterizedTest
+    @MethodSource("testDataProvider")
+    public void test_globalLockWaitAllNonGlobalUnlock(TestData testData) throws Exception {
+
+        AtomicBoolean tryAcquireForThread3 = new AtomicBoolean();
+        AbstractEntityLockerImpl locker = testData.locker;
+
+        CountDownLatch latch = new CountDownLatch(2);
+
+        Thread thread1 = new Thread(() -> {
+            locker.lock(testData.entityIds[0]);
+            latch.countDown();
+        });
+        thread1.start();
+
+        Thread thread2 = new Thread(() -> {
+            locker.lock(testData.entityIds[1]);
+            latch.countDown();
+        });
+        thread2.start();
+
+        Thread thread3 = new Thread(() -> {
+            try {
+                latch.await();
+                locker.globalLock();
+                tryAcquireForThread3.set(true);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+        });
+        thread3.start();
+        latch.await();
+
+        Assertions.assertFalse(tryAcquireForThread3.get());
+    }
+
+    @ParameterizedTest
+    @MethodSource("testDataProvider")
+    public void test_globalLockAndAllNonGlobalWait(TestData testData) throws Exception {
+
+        AtomicBoolean tryAcquireForNonGlobal = new AtomicBoolean();
+        AtomicBoolean tryAcquireForGlobal = new AtomicBoolean();
+        AbstractEntityLockerImpl locker = testData.locker;
+
+        CountDownLatch latch = new CountDownLatch(1);
+
+        Thread thread1 = new Thread(() -> {
+            locker.globalLock();
+            tryAcquireForGlobal.set(true);
+            latch.countDown();
+        });
+        thread1.start();
+
+        Thread thread2 = new Thread(() -> {
+            try {
+                latch.await();
+                locker.lock(testData.entityIds[1]);
+                tryAcquireForNonGlobal.set(true);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        thread2.start();
+
+        Thread thread3 = new Thread(() -> {
+            try {
+                latch.await();
+                locker.lock(testData.entityIds[1]);
+                tryAcquireForNonGlobal.set(true);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        thread3.start();
+
+        latch.await();
+
+        Assertions.assertFalse(tryAcquireForNonGlobal.get());
+        Assertions.assertTrue(tryAcquireForGlobal.get());
+    }
+
+    @ParameterizedTest
+    @MethodSource("testDataProvider")
+    public void test_globalUnLock(TestData testData) throws Exception {
+
+        AtomicBoolean tryAcquireForNonGlobal = new AtomicBoolean();
+        AtomicBoolean tryAcquireForGlobal = new AtomicBoolean();
+        AbstractEntityLockerImpl locker = testData.locker;
+
+        CountDownLatch latch = new CountDownLatch(2);
+
+        Thread thread1 = new Thread(() -> {
+            try {
+                locker.globalLock();
+                tryAcquireForGlobal.set(true);
+                latch.countDown();
+            } finally {
+                locker.globalUnlock();
+            }
+
+        });
+        thread1.start();
+
+        Thread thread2 = new Thread(() -> {
+            locker.lock(testData.entityIds[1]);
+            tryAcquireForNonGlobal.set(true);
+            latch.countDown();
+        });
+        thread2.start();
+
+        latch.await();
+
+        Assertions.assertTrue(tryAcquireForNonGlobal.get());
+        Assertions.assertTrue(tryAcquireForGlobal.get());
+    }
+
+    @ParameterizedTest
+    @MethodSource("testDataProvider")
+    public void test_reentrantGlobalUnLock(TestData testData) throws Exception {
+
+        AtomicBoolean tryAcquireForGlobal = new AtomicBoolean();
+        AbstractEntityLockerImpl locker = testData.locker;
+
+        CountDownLatch latch = new CountDownLatch(1);
+
+        Thread thread1 = new Thread(() -> {
+            try {
+                locker.globalLock();
+                try {
+                    locker.globalLock();
+                    tryAcquireForGlobal.set(true);
+                } finally {
+                    locker.globalUnlock();
+                }
+                latch.countDown();
+            } finally {
+                locker.globalUnlock();
+            }
+
+        });
+        thread1.start();
+
+        latch.await();
+
+        Assertions.assertTrue(tryAcquireForGlobal.get());
+    }
+
+    @ParameterizedTest
+    @MethodSource("testDataProvider")
+    public void test_tryGlobakLockWithTimeout(TestData testData) throws Exception {
+
+        AtomicBoolean tryAcquireForThread2 = new AtomicBoolean();
+        AbstractEntityLockerImpl locker = testData.locker;
+        CountDownLatch latch = new CountDownLatch(1);
+
+        Thread thread1 = new Thread(() -> {
+            locker.globalLock();
+            latch.countDown();
+        });
+        thread1.start();
+
+        AtomicLong timePassed = new AtomicLong(0);
+        Thread thread2 = new Thread(() -> {
+            try {
+                latch.await();
+                long start = System.nanoTime();
+                tryAcquireForThread2.set(locker.tryGlobalLock(10, TimeUnit.SECONDS));
+                long end = System.nanoTime();
+                timePassed.set(end - start);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        thread2.start();
+        thread2.join();
+
+        Assertions.assertFalse(tryAcquireForThread2.get());
+        Assertions.assertTrue(timePassed.get() >= TimeUnit.SECONDS.toNanos(10));
+    }
+
 
     static List<TestData> testDataProvider() {
         return List.of(

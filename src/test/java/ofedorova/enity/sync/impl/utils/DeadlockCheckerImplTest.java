@@ -1,4 +1,4 @@
-package ofedorova.enity.sync.impl.lockers;
+package ofedorova.enity.sync.impl.utils;
 
 import com.google.common.collect.Sets;
 import ofedorova.enity.sync.EntityLock;
