@@ -22,7 +22,7 @@ public class CustomLock implements EntityLock {
 
     @Override
     public void lock() {
-        if (!tryAcquire() && addWaiterAndAcquireQueued()) {
+        if (!tryAcquire() && addWaiterAndAcquireQueued(0, false)) {
             Thread.currentThread().interrupt();
         }
     }
@@ -38,8 +38,12 @@ public class CustomLock implements EntityLock {
     }
 
     @Override
-    public boolean tryLock(long l, TimeUnit timeUnit) throws InterruptedException {
-        throw new UnsupportedOperationException();
+    public boolean tryLock(long timeout, TimeUnit timeUnit) throws InterruptedException {
+        if (Thread.interrupted()) {
+            throw new InterruptedException();
+        } else {
+            return tryAcquire() || addWaiterAndAcquireQueued(timeUnit.toNanos(timeout), true);
+        }
     }
 
     @Override
@@ -66,12 +70,22 @@ public class CustomLock implements EntityLock {
         return false;
     }
 
-    boolean addWaiterAndAcquireQueued() {
+    boolean addWaiterAndAcquireQueued(long nanosTimeout, boolean checkTimeout) {
+        if (checkTimeout && nanosTimeout <= 0L) {
+            return false;
+        }
+
+        long deadline = System.nanoTime() + nanosTimeout;
         Thread currentThread = Thread.currentThread();
         waiters.add(currentThread);
 
         while (true) {
             if (currentThread.isInterrupted()) {
+                waiters.remove(currentThread);
+                return false;
+            }
+
+            if (checkTimeout && deadline - System.nanoTime() <= 0L) {
                 waiters.remove(currentThread);
                 return false;
             }

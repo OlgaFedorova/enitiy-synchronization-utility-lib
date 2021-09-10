@@ -87,6 +87,40 @@ class DeadlockCheckerImplTest {
     }
 
     /*
+    T1 holds R1, wait R2
+    T2 holds R2, wait R3
+    T3 holds R3
+    T4 holds R4
+
+    T3 tries to block R4 and queued to waiting R4
+     */
+    @Test
+    public void test_notDeadlockPossibleCase3() throws Exception {
+        DeadlockCheckerImpl deadlockChecker = new DeadlockCheckerImpl();
+        Field locksByThreadsField = DeadlockCheckerImpl.class.getDeclaredField("locksByThreads");
+        locksByThreadsField.setAccessible(true);
+        Map<Thread, Set<EntityLockInfo>> locksByThreads = (Map<Thread, Set<EntityLockInfo>>) locksByThreadsField.get(deadlockChecker);
+
+        Thread t1 = new Thread();
+        Thread t2 = new Thread();
+        Thread t3 = Thread.currentThread();
+        Thread t4 = new Thread();
+
+        EntityLockInfo r1 = new EntityLockInfo("r1", new EntityTestLock(t1, Sets.newHashSet()));
+        EntityLockInfo r2 = new EntityLockInfo("r2", new EntityTestLock(t2, Sets.newHashSet(t1)));
+        EntityLockInfo r3 = new EntityLockInfo("r3", new EntityTestLock(t3, Sets.newHashSet(t2)));
+        EntityLockInfo r4 = new EntityLockInfo("r4", new EntityTestLock(t4, Sets.newHashSet()));
+
+        locksByThreads.put(t1, Sets.newHashSet(r1, r2));
+        locksByThreads.put(t2, Sets.newHashSet(r2, r3));
+        locksByThreads.put(t3, Sets.newHashSet(r3));
+        locksByThreads.put(t4, Sets.newHashSet(r3));
+
+        deadlockChecker.beforeLock(r4, true);
+
+    }
+
+    /*
     T1 holds R1,wait R2
     T2 holds R2
 
@@ -146,6 +180,43 @@ class DeadlockCheckerImplTest {
             locksByThreads.put(t3, Sets.newHashSet(r3, r4));
 
             deadlockChecker.beforeLock(r3, true);
+
+        });
+    }
+
+    /*
+    T1 holds R1, wait R2
+    T2 holds R2, wait R3
+    T3 holds R3, wait R4
+    T4 holds R4
+
+    T4 tries to block R1 and get deadlock
+     */
+    @Test
+    public void test_deadlockPossibleCase3() throws Exception {
+        Assertions.assertThrows(DeadlockException.class, () -> {
+
+            DeadlockCheckerImpl deadlockChecker = new DeadlockCheckerImpl();
+            Field locksByThreadsField = DeadlockCheckerImpl.class.getDeclaredField("locksByThreads");
+            locksByThreadsField.setAccessible(true);
+            Map<Thread, Set<EntityLockInfo>> locksByThreads = (Map<Thread, Set<EntityLockInfo>>) locksByThreadsField.get(deadlockChecker);
+
+            Thread t1 = new Thread();
+            Thread t2 = new Thread();
+            Thread t3 = new Thread();
+            Thread t4 = Thread.currentThread();
+
+            EntityLockInfo r1 = new EntityLockInfo("r1", new EntityTestLock(t1, Sets.newHashSet()));
+            EntityLockInfo r2 = new EntityLockInfo("r2", new EntityTestLock(t2, Sets.newHashSet(t1)));
+            EntityLockInfo r3 = new EntityLockInfo("r3", new EntityTestLock(t3, Sets.newHashSet(t2)));
+            EntityLockInfo r4 = new EntityLockInfo("r4", new EntityTestLock(t4, Sets.newHashSet(t3)));
+
+            locksByThreads.put(t1, Sets.newHashSet(r1, r2));
+            locksByThreads.put(t2, Sets.newHashSet(r2, r3));
+            locksByThreads.put(t3, Sets.newHashSet(r3, r4));
+            locksByThreads.put(t4, Sets.newHashSet(r4));
+
+            deadlockChecker.beforeLock(r1, true);
 
         });
     }

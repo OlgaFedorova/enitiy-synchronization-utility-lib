@@ -6,8 +6,10 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Field;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * CustomLockTest.
@@ -95,7 +97,7 @@ public class CustomLockTest {
         thread1.join();
 
         Thread thread2 = new Thread(() -> {
-            tryAcquireForThread2.set(customLock.addWaiterAndAcquireQueued());
+            tryAcquireForThread2.set(customLock.addWaiterAndAcquireQueued(0, false));
         });
         thread2.start();
         thread2.interrupt();
@@ -143,7 +145,7 @@ public class CustomLockTest {
     }
 
     @Test
-    public void tes_reentrantLockWithoutUnlock() throws Exception {
+    public void test_reentrantLockWithoutUnlock() throws Exception {
         CustomLock customLock = new CustomLock();
 
         customLock.lock();
@@ -167,7 +169,7 @@ public class CustomLockTest {
     }
 
     @Test
-    public void tes_reentrantLockWithOneUnlock() throws Exception {
+    public void test_reentrantLockWithOneUnlock() throws Exception {
         CustomLock customLock = new CustomLock();
 
         try {
@@ -195,7 +197,7 @@ public class CustomLockTest {
     }
 
     @Test
-    public void tes_reentrantLockWithCorrectUnlock() throws Exception {
+    public void test_reentrantLockWithCorrectUnlock() throws Exception {
         CustomLock customLock = new CustomLock();
 
         try {
@@ -224,6 +226,37 @@ public class CustomLockTest {
         Assertions.assertEquals(null, ownerThread);
         Assertions.assertEquals(0, stateThread.get());
         Assertions.assertEquals(0, waiters.size());
+    }
+
+    @Test
+    public void test_tryLockWithTimeout() throws Exception {
+        CustomLock customLock = new CustomLock();
+
+        AtomicBoolean tryAcquireForThread1 = new AtomicBoolean();
+        AtomicBoolean tryAcquireForThread2 = new AtomicBoolean();
+
+        Thread thread1 = new Thread(() -> {
+            tryAcquireForThread1.set(customLock.tryAcquire());
+        });
+        thread1.start();
+
+        AtomicLong timePassed = new AtomicLong(0);
+        Thread thread2 = new Thread(() -> {
+            try {
+                long start = System.nanoTime();
+                tryAcquireForThread2.set(customLock.tryLock(10, TimeUnit.SECONDS));
+                long end = System.nanoTime();
+                timePassed.set(end - start);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        thread2.start();
+        thread2.join();
+
+        Assertions.assertTrue(tryAcquireForThread1.get());
+        Assertions.assertFalse(tryAcquireForThread2.get());
+        Assertions.assertTrue(timePassed.get() >= TimeUnit.SECONDS.toNanos(10));
     }
 
 }

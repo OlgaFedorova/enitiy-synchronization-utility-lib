@@ -43,7 +43,18 @@ concurrent request to lock the same entity, the other thread should wait until t
 
 5. It allows reentrant locking.
 
-6. It allows the caller to specify timeout for locking an entity.
+6. It allows the caller to specify timeout for locking an entity with construction:
+  ```java
+ EntityLocker entityLocker;
+ T entityId;
+ .....
+  try {
+      entityLocker.tryLock(entityId, 10, TimeUnit.SECONDS);
+      ...;
+  } finally {
+      entityLocker.unlock(entityId);
+  }
+  ```
 
 7. It implements protection from deadlocks (but not taking into account possible locks outside EntityLocker).
 
@@ -121,6 +132,18 @@ try {
 2. Guarantee that at most one thread executes protected code.
 
 3. Allow reentrant locking
+
+4. It allows the caller to specify timeout for locking an entity with construction:
+ ```java
+ CustomLock customLock = new CustomLock();
+ 
+ try {
+     customLock.tryLock(10, TimeUnit.SECONDS);
+     ...;
+ } finally {
+     customLock.unlock();
+ }
+ ```
 
 Tests for class are implement [here](src/test/java/ofedorova/enity/sync/impl/locks/CustomLockTest.java).
 

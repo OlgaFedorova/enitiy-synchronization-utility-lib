@@ -12,6 +12,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 
@@ -202,6 +205,39 @@ class EntityLockerImplTest {
             }
 
         });
+    }
+
+    @ParameterizedTest
+    @MethodSource("testDataProvider")
+    public void test_tryLockWithTimeout(TestData testData) throws Exception {
+
+        AtomicBoolean tryAcquireForThread2 = new AtomicBoolean();
+        AbstractEntityLockerImpl locker = testData.locker;
+        CountDownLatch latch = new CountDownLatch(1);
+
+        Thread thread1 = new Thread(() -> {
+            locker.lock(testData.entityIds[0]);
+            latch.countDown();
+        });
+        thread1.start();
+
+        AtomicLong timePassed = new AtomicLong(0);
+        Thread thread2 = new Thread(() -> {
+            try {
+                latch.await();
+                long start = System.nanoTime();
+                tryAcquireForThread2.set(locker.tryLock(testData.entityIds[0], 10, TimeUnit.SECONDS));
+                long end = System.nanoTime();
+                timePassed.set(end - start);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        thread2.start();
+        thread2.join();
+
+        Assertions.assertFalse(tryAcquireForThread2.get());
+        Assertions.assertTrue(timePassed.get() >= TimeUnit.SECONDS.toNanos(10));
     }
 
 
