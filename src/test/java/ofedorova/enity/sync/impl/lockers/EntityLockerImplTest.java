@@ -36,7 +36,7 @@ class EntityLockerImplTest {
             EntityLocker locker = testData.locker;
             Object entityId = testData.entityIds[0];
             try {
-                locker.lock(entityId, true);
+                locker.lock(entityId);
                 result.set(entityId);
             } finally {
                 locker.unlock(entityId);
@@ -62,7 +62,7 @@ class EntityLockerImplTest {
             EntityLocker locker = testData.locker;
             Object entityId = testData.entityIds[0];
             try {
-                locker.lock(entityId, true);
+                locker.lock(entityId);
                 result.set(entityId);
             } finally {
                 locker.unlock(entityId);
@@ -74,7 +74,7 @@ class EntityLockerImplTest {
             EntityLocker locker = testData.locker;
             Object entityId = testData.entityIds[0];
             try {
-                locker.lock(entityId, true);
+                locker.lock(entityId);
                 new Thread(runnable).start();
             } finally {
                 locker.unlock(entityId);
@@ -99,7 +99,7 @@ class EntityLockerImplTest {
         new Thread(() -> {
             EntityLocker locker = testData.locker;
             Object entityId = testData.entityIds[0];
-            locker.lock(entityId, true);
+            locker.lock(entityId);
             resultForFirsrEntity.set(entityId);
             latch.countDown();
         }).start();
@@ -107,7 +107,7 @@ class EntityLockerImplTest {
         new Thread(() -> {
             EntityLocker locker = testData.locker;
             Object entityId = testData.entityIds[1];
-            locker.lock(entityId, true);
+            locker.lock(entityId);
             resultForSecondEntity.set(entityId);
             latch.countDown();
         }).start();
@@ -130,9 +130,9 @@ class EntityLockerImplTest {
             EntityLocker locker = testData.locker;
             Object entityId = testData.entityIds[0];
             try {
-                locker.lock(entityId, true);
+                locker.lock(entityId);
                 try {
-                    locker.lock(entityId, true);
+                    locker.lock(entityId);
                     result.set(entityId);
                     latch.countDown();
                 } finally {
@@ -164,11 +164,11 @@ class EntityLockerImplTest {
 
             executorService.submit(() -> {
                 try {
-                    locker.lock(testData.entityIds[0], true);
-                    locker.lock(testData.entityIds[3], true);
+                    locker.lock(testData.entityIds[0]);
+                    locker.lock(testData.entityIds[3]);
                     latchForEntity1.countDown();
                     latchForEntity2.await();
-                    locker.lock(testData.entityIds[1], true);
+                    locker.lock(testData.entityIds[1]);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -176,17 +176,17 @@ class EntityLockerImplTest {
 
             executorService.submit(() -> {
                 try {
-                    locker.lock(testData.entityIds[1], true);
-                    locker.lock(testData.entityIds[4], true);
+                    locker.lock(testData.entityIds[1]);
+                    locker.lock(testData.entityIds[4]);
                     latchForEntity2.countDown();
                     latchForEntity3.await();
-                    locker.lock(testData.entityIds[2], true);
+                    locker.lock(testData.entityIds[2]);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             });
 
-            locker.lock(testData.entityIds[2], true);
+            locker.lock(testData.entityIds[2]);
             latchForEntity3.countDown();
 
             latchForEntity1.await();
@@ -200,7 +200,7 @@ class EntityLockerImplTest {
                 if (lockInfo1.getLock().getOwner() != null &&
                         lockInfo2.getLock().getOwnerAndQueuedThreads().size() == 2 &&
                         lockInfo3.getLock().getOwnerAndQueuedThreads().size() == 2) {
-                    locker.lock(testData.entityIds[0], true);
+                    locker.lock(testData.entityIds[0]);
                 }
             }
 
@@ -420,6 +420,108 @@ class EntityLockerImplTest {
         Assertions.assertFalse(tryAcquireForThread2.get());
         Assertions.assertTrue(timePassed.get() >= TimeUnit.SECONDS.toNanos(10));
     }
+
+    @ParameterizedTest
+    @MethodSource("testDataProvider")
+    public void test_globalLockEscalation(TestData testData) throws Exception {
+
+        AtomicBoolean tryAcquireForThread2 = new AtomicBoolean();
+        AbstractEntityLockerImpl locker = testData.locker;
+        CountDownLatch latch = new CountDownLatch(1);
+
+        Thread thread1 = new Thread(() -> {
+            locker.lock(testData.entityIds[0]);
+            locker.lock(testData.entityIds[1]);
+            locker.lock(testData.entityIds[2]);
+            locker.lock(testData.entityIds[3]);
+            latch.countDown();
+        });
+        thread1.start();
+
+        Thread thread2 = new Thread(() -> {
+            try {
+                latch.await();
+                locker.lock(testData.entityIds[4]);
+                tryAcquireForThread2.set(true);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        thread2.start();
+
+        Assertions.assertFalse(tryAcquireForThread2.get());
+    }
+
+    @ParameterizedTest
+    @MethodSource("testDataProvider")
+    public void test_globalLockEscalationFree(TestData testData) throws Exception {
+
+        AtomicBoolean tryAcquireForThread2 = new AtomicBoolean();
+        AbstractEntityLockerImpl locker = testData.locker;
+        CountDownLatch latch = new CountDownLatch(1);
+
+        Thread thread1 = new Thread(() -> {
+            locker.lock(testData.entityIds[0]);
+            locker.lock(testData.entityIds[1]);
+            locker.lock(testData.entityIds[2]);
+            locker.lock(testData.entityIds[3]);
+            locker.unlock(testData.entityIds[3]);
+            latch.countDown();
+        });
+        thread1.start();
+
+        Thread thread2 = new Thread(() -> {
+            try {
+                latch.await();
+                locker.lock(testData.entityIds[4]);
+                tryAcquireForThread2.set(true);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        thread2.start();
+        thread2.join();
+
+        Assertions.assertTrue(tryAcquireForThread2.get());
+    }
+
+    @ParameterizedTest
+    @MethodSource("testDataProvider")
+    public void test_globalLoclWithTryLockEscalationFree(TestData testData) throws Exception {
+
+        AtomicBoolean tryAcquireForThread2 = new AtomicBoolean();
+        AbstractEntityLockerImpl locker = testData.locker;
+        CountDownLatch latch = new CountDownLatch(1);
+
+        Thread thread1 = new Thread(() -> {
+            try {
+                locker.lock(testData.entityIds[0]);
+                locker.lock(testData.entityIds[1]);
+                locker.lock(testData.entityIds[2]);
+                locker.tryLock(testData.entityIds[3], 10, TimeUnit.MICROSECONDS);
+                locker.unlock(testData.entityIds[3]);
+                latch.countDown();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        thread1.start();
+
+        Thread thread2 = new Thread(() -> {
+            try {
+                latch.await();
+                locker.lock(testData.entityIds[4]);
+                tryAcquireForThread2.set(true);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        thread2.start();
+        thread2.join();
+
+        Assertions.assertTrue(tryAcquireForThread2.get());
+    }
+
 
 
     static List<TestData> testDataProvider() {

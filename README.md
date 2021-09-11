@@ -83,6 +83,9 @@ try {
 }
 ```
 
+9. Implement lock escalation. If a single thread has locked too many entities, escalate its lock to be a 
+global lock.
+
 # Implementation
 
 ## AbstractEntityLockerImpl

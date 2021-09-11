@@ -10,6 +10,14 @@ import ofedorova.enity.sync.impl.locks.CustomLock;
  */
 public class EntityCustomLockImpl<T> extends AbstractEntityLockerImpl<T> {
 
+    public EntityCustomLockImpl() {
+        super();
+    }
+
+    public EntityCustomLockImpl(int countGlobalLockEscalation) {
+        super(countGlobalLockEscalation);
+    }
+
     @Override
     protected EntityLockInfo getLock(T entityId) {
         if (entityId == null) {

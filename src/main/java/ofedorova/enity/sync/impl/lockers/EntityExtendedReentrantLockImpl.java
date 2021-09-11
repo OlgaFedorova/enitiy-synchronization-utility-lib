@@ -10,6 +10,14 @@ import ofedorova.enity.sync.impl.locks.ExtendedReentrantLock;
  */
 public class EntityExtendedReentrantLockImpl<T> extends AbstractEntityLockerImpl<T> {
 
+    public EntityExtendedReentrantLockImpl() {
+        super();
+    }
+
+    public EntityExtendedReentrantLockImpl(int countGlobalLockEscalation) {
+        super(countGlobalLockEscalation);
+    }
+
     @Override
     protected EntityLockInfo getLock(T entityId) {
         if (entityId == null) {
